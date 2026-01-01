@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thalia Draw</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+        .main-grid { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 20px; }
+        .card { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .card-title { font-size: 1.3em; font-weight: bold; margin-bottom: 15px; color: #667eea; }
+        .ai-panel { display: flex; flex-direction: column; gap: 15px; }
+        .input-tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab-btn {
+            flex: 1; padding: 10px; border: 2px solid #667eea; background: white;
+            color: #667eea; border-radius: 8px; cursor: pointer; transition: all 0.3s; font-weight: bold;
+        }
+        .tab-btn.active { background: #667eea; color: white; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        textarea {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0;
+            border-radius: 8px; resize: vertical; font-family: inherit; font-size: 14px;
+        }
+        .voice-btn, .photo-btn {
+            width: 100%; padding: 15px; border: 2px dashed #667eea;
+            background: #f3f4ff; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.3s;
+        }
+        .voice-btn:hover, .photo-btn:hover { background: #667eea; color: white; }
+        .voice-btn.recording { background: #ef4444; color: white; border-color: #ef4444; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .generate-btn {
+            width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .generate-btn:hover { transform: translateY(-2px); }
+        .generate-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .api-status { padding: 10px; border-radius: 8px; text-align: center; font-size: 0.9em; }
+        .api-status.connected { background: #d1fae5; color: #065f46; }
+        .api-status.disconnected { background: #fee2e2; color: #991b1b; }
+        .config-btn {
+            width: 100%; padding: 10px; background: #f3f4f6; border: 2px solid #d1d5db;
+            border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        }
+        .config-btn:hover { background: #e5e7eb; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+        .tool-btn {
+            padding: 10px 15px; border: 2px solid #e0e0e0; background: white;
+            border-radius: 8px; cursor: pointer; transition: all 0.3s;
+        }
+        .tool-btn.active { background: #667eea; color: white; border-color: #667eea; }
+        .color-picker { display: flex; gap: 5px; }
+        .color-btn {
+            width: 30px; height: 30px; border-radius: 50%; border: 2px solid #ddd;
+            cursor: pointer; transition: transform 0.2s;
+        }
+        .color-btn:hover { transform: scale(1.2); }
+        .color-btn.active { border: 3px solid #667eea; box-shadow: 0 0 10px rgba(102, 126, 234, 0.5); }
+        #drawCanvas {
+            border: 3px solid #e0e0e0; border-radius: 10px; cursor: crosshair;
+            background: white; max-width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .gallery { max-height: 700px; overflow-y: auto; }
+        .gallery-item {
+            margin-bottom: 15px; border: 2px solid #e0e0e0; border-radius: 10px;
+            overflow: hidden; transition: all 0.3s;
+        }
+        .gallery-item:hover { box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        .gallery-img { width: 100%; height: 150px; object-fit: cover; }
+        .gallery-info { padding: 10px; background: #f9fafb; }
+        .gallery-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
+        .delete-btn { padding: 5px 10px; background: #fee2e2; color: #991b1b; border: none; border-radius: 5px; cursor: pointer; }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 15px; padding: 30px; max-width: 500px; width: 90%; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-title { font-size: 1.5em; font-weight: bold; color: #667eea; }
+        .close-btn { background: none; border: none; font-size: 2em; cursor: pointer; color: #999; }
+        .alert { padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .alert-info { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #374151; }
+        .form-group input { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; }
+        .btn-primary { width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .loading { text-align: center; padding: 20px; color: #667eea; }
+        .spinner {
+            border: 3px solid #f3f4f6; border-top: 3px solid #667eea; border-radius: 50%;
+            width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        input[type="file"] { display: none; }
+        @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Thalia Draw</h1>
+            <p>Créez votre histoire avec l'IA</p>
+        </div>
+
+        <div class="main-grid">
+            <div class="card">
+                <div class="card-title">🤖 Génération IA</div>
+                <div class="api-status" id="apiStatus">⚠️ API non configurée</div>
+                <button class="config-btn" onclick="openModal()">⚙️ Configurer l'API</button>
+                <div class="ai-panel">
+                    <div class="input-tabs">
+                        <button class="tab-btn active" onclick="switchTab('text')">📝 Texte</button>
+                        <button class="tab-btn" onclick="switchTab('voice')">🎤 Vocal</button>
+                        <button class="tab-btn" onclick="switchTab('photo')">📷 Photo</button>
+                    </div>
+                    <div class="tab-content active" id="textTab">
+                        <textarea id="textInput" rows="6" placeholder="Décrivez votre dessin..."></textarea>
+                    </div>
+                    <div class="tab-content" id="voiceTab">
+                        <div class="voice-btn" id="voiceBtn" onclick="toggleVoice()">🎤 Cliquez pour parler</div>
+                        <div id="voiceText" style="margin-top:10px;padding:10px;background:#f3f4ff;border-radius:8px;min-height:60px;"></div>
+                    </div>
+                    <div class="tab-content" id="photoTab">
+                        <input type="file" id="photoInput" accept="image/*" onchange="handlePhoto(event)">
+                        <div class="photo-btn" onclick="document.getElementById('photoInput').click()">📷 Télécharger une photo</div>
+                        <div id="photoPreview"></div>
+                    </div>
+                    <button class="generate-btn" onclick="generate()" id="generateBtn">✨ Générer le dessin</button>
+                    <div id="loadingIndicator" class="loading" style="display:none;">
+                        <div class="spinner"></div>
+                        <p>Génération en cours...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🎨 Canvas</div>
+                <div class="toolbar">
+                    <button class="tool-btn active" onclick="selectTool('pen')">✏️ Crayon</button>
+                    <button class="tool-btn" onclick="selectTool('eraser')">🧹 Gomme</button>
+                    <div class="color-picker" id="colorPicker"></div>
+                    <input type="range" min="1" max="20" value="3" id="lineWidth">
+                    <button class="tool-btn" onclick="clearCanvas()">🗑️ Effacer</button>
+                    <button class="tool-btn" onclick="saveDrawing()">💾 Sauvegarder</button>
+                    <button class="tool-btn" onclick="download()">⬇️ Télécharger</button>
+                </div>
+                <canvas id="drawCanvas" width="800" height="600"></canvas>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🖼️ Ma Galerie</div>
+                <div class="gallery" id="gallery"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="apiModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">🔑 Configuration API</div>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="alert alert-info">
+                <strong>📖 Comment obtenir votre clé API :</strong><br>
+                1. Créez un compte sur <a href="https://www.perplexity.ai/settings/api" target="_blank" style="color:#1e40af;font-weight:bold;">Perplexity AI</a><br>
+                2. Accédez aux paramètres API<br>
+                3. Générez une nouvelle clé API<br>
+                4. Copiez et collez-la ci-dessous
+            </div>
+            <div class="form-group">
+                <label>Clé API Perplexity</label>
+                <input type="password" id="apiKeyInput" placeholder="pplx-xxxxxxxxxxxxx">
+            </div>
+            <button class="btn-primary" onclick="saveKey()">💾 Enregistrer</button>
+        </div>
+    </div>
+
+    <script>
+        let canvas, ctx, isDrawing = false, currentTool = 'pen', currentColor = '#000000';
+        let lineWidth = 3, drawings = [], apiKey = '', currentTab = 'text';
+        let mediaRecorder, audioChunks = [], uploadedPhoto = null;
+        const colors = ['#000000', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#A020F0', '#FFFFFF'];
+
+        window.onload = function() {
+            canvas = document.getElementById('drawCanvas');
+            ctx = canvas.getContext('2d');
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            apiKey = localStorage.getItem('perplexityApiKey') || '';
+            updateStatus();
+            const picker = document.getElementById('colorPicker');
+            colors.forEach(c => {
+                const btn = document.createElement('div');
+                btn.className = 'color-btn';
+                btn.style.backgroundColor = c;
+                if (c === '#FFFFFF') btn.style.border = '2px solid #999';
+                if (c === currentColor) btn.classList.add('active');
+                btn.onclick = () => selectColor(c);
+                picker.appendChild(btn);
+            });
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDraw);
+            canvas.addEventListener('mouseleave', stopDraw);
+            loadGallery();
+        };
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        function startDraw(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            ctx.beginPath();
+            ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            ctx.strokeStyle = currentTool === 'eraser' ? '#FFFFFF' : currentColor;
+            ctx.lineWidth = currentTool === 'eraser' ? lineWidth * 3 : lineWidth;
+            ctx.stroke();
+        }
+
+        function stopDraw() { isDrawing = false; }
+
+        function selectTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function selectColor(color) {
+            currentColor = color;
+            document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        document.getElementById('lineWidth').oninput = (e) => { lineWidth = e.target.value; };
+
+        function clearCanvas() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        async function toggleVoice() {
+            const btn = document.getElementById('voiceBtn');
+            const txt = document.getElementById('voiceText');
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = (e) => { audioChunks.push(e.data); };
+                    mediaRecorder.onstop = () => {
+                        txt.textContent = '🎵 Audio enregistré';
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    mediaRecorder.start();
+                    btn.classList.add('recording');
+                    btn.textContent = '⏹️ Arrêter';
+                    txt.textContent = '🎤 Enregistrement...';
+                } catch (err) {
+                    alert('Erreur micro: ' + err.message);
+                }
+            } else {
+                mediaRecorder.stop();
+                btn.classList.remove('recording');
+                btn.textContent = '🎤 Cliquez pour parler';
+            }
+        }
+
+        function handlePhoto(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedPhoto = e.target.result;
+                    document.getElementById('photoPreview').innerHTML = '<img src="' + uploadedPhoto + '" style="width:100%;border-radius:8px;margin-top:10px;"><p style="text-align:center;color:#667eea;margin-top:5px;">✅ Photo chargée</p>';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function generate() {
+            if (!apiKey) { alert('⚠️ Configurez votre API'); openModal(); return; }
+            const loading = document.getElementById('loadingIndicator');
+            const btn = document.getElementById('generateBtn');
+            loading.style.display = 'block';
+            btn.disabled = true;
+            try {
+                let prompt = '';
+                if (currentTab === 'text') {
+                    prompt = document.getElementById('textInput').value;
+                    if (!prompt) { alert('⚠️ Entrez une description'); return; }
+                } else if (currentTab === 'voice') {
+                    prompt = 'Dessin créatif basé sur audio';
+                } else {
+                    if (!uploadedPhoto) { alert('⚠️ Téléchargez une photo'); return; }
+                    prompt = 'Dessin inspiré d\'image';
+                }
+                const instructions = await getInstructions(prompt);
+                await drawAI(instructions);
+            } catch (error) {
+                alert('❌ Erreur: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        async function getInstructions(prompt) {
+            const res = await fetch('https://api.perplexity.ai/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'llama-3.1-sonar-small-128k-online',
+                    messages: [{ 
+                        role: 'user', 
+                        content: `Tu es un artiste VISIONNAIRE et EXTRAVAGANT qui crée des œuvres d'art explosives et colorées ! 🎨✨
+
+MISSION: Crée un dessin SPECTACULAIRE et ÉPOUSTOUFLANT pour: "${prompt}"
+
+STYLE ARTISTIQUE REQUIS:
+🌈 EXPLOSION DE COULEURS - utilise des couleurs vives, contrastées, audacieuses (pas de gris fade!)
+💫 SURRÉALISME - ose l'imaginaire, le fantastique, l'impossible
+✨ DÉTAILS INFINIS - 50 à 120 éléments visuels minimum
+🎭 COMPOSITION DYNAMIQUE - mouvement, énergie, vie
+🎪 CRÉATIVITÉ DÉBRIDÉE - ajoute des éléments surprenants et magiques
+
+PALETTE DE COULEURS VIBRANTES À PRIVILÉGIER:
+- Rouges: #FF0000, #FF1493, #DC143C, #FF6347
+- Roses/Magentas: #FF00FF, #FF69B4, #FFB6C1, #FF10F0
+- Oranges: #FF4500, #FF8C00, #FFA500, #FFD700
+- Jaunes: #FFFF00, #FFD700, #FFA500, #FFEB3B
+- Verts: #00FF00, #32CD32, #00FA9A, #7FFF00
+- Bleus: #0000FF, #1E90FF, #00BFFF, #4169E1
+- Violets: #8B00FF, #9400D3, #BA55D3, #DA70D6
+- Turquoises: #00FFFF, #40E0D0, #48D1CC, #00CED1
+
+TYPES D'ÉLÉMENTS (tous disponibles):
+1. "circle": {type:"circle", x, y, radius, color, fill:true/false, lineWidth}
+2. "rectangle": {type:"rectangle", x, y, width, height, color, fill:true/false, lineWidth, rotation}
+3. "line": {type:"line", x, y, x2, y2, color, lineWidth}
+4. "arc": {type:"arc", x, y, radius, startAngle, endAngle, color, lineWidth, counterclockwise:false}
+5. "bezier": {type:"bezier", x, y, cp1x, cp1y, cp2x, cp2y, x2, y2, color, lineWidth}
+6. "quadratic": {type:"quadratic", x, y, cpx, cpy, x2, y2, color, lineWidth}
+7. "polygon": {type:"polygon", points:[{x,y},{x,y}...], color, fill:true/false, lineWidth}
+8. "star": {type:"star", x, y, radius, points:5, color, fill:true}
+9. "spiral": {type:"spiral", x, y, radius, turns, color, lineWidth}
+10. "gradient": {type:"gradient", x, y, width, height, colors:["#color1","#color2"]}
+
+EXEMPLES D'ÉLÉMENTS À AJOUTER (selon le thème):
+🌟 Étoiles scintillantes partout
+🎆 Rayons de lumière en explosion
+💎 Formes géométriques abstraites superposées
+🌸 Fleurs psychédéliques multicolores
+🦋 Papillons fantastiques
+✨ Particules magiques flottantes
+🌀 Spirales hypnotiques
+💫 Comètes et trainées lumineuses
+🎨 Éclaboussures de peinture
+🔮 Sphères lumineuses translucides
+
+COMPOSITION:
+- Utilise TOUT l'espace 800x600
+- Crée de la profondeur avec plusieurs couches
+- Ajoute des effets de mouvement avec des courbes
+- Superpose des éléments semi-transparents (alpha)
+- Crée des motifs répétitifs mais variés
+
+Réponds UNIQUEMENT avec un tableau JSON gigantesque (50-120 éléments), rien d'autre. Fais exploser l'imagination !` 
+                    }],
+                    temperature: 0.95,
+                    max_tokens: 4000
+                })
+            });
+            if (!res.ok) throw new Error('Erreur API');
+            const data = await res.json();
+            const content = data.choices[0].message.content;
+            try {
+                const match = content.match(/\[[\s\S]*\]/);
+                if (match) return JSON.parse(match[0]);
+                throw new Error('Format invalide');
+            } catch (e) {
+                console.error('Erreur parsing, utilisation fallback extravagant');
+                return generateExtravagantFallback(prompt);
+            }
+        }
+
+        function generateExtravagantFallback(prompt) {
+            const elements = [];
+            
+            // Fond gradient arc-en-ciel
+            elements.push({type:'rectangle',x:0,y:0,width:800,height:200,color:'#FF00FF',fill:true});
+            elements.push({type:'rectangle',x:0,y:200,width:800,height:200,color:'#00FFFF',fill:true});
+            elements.push({type:'rectangle',x:0,y:400,width:800,height:200,color:'#FFFF00',fill:true});
+            
+            // Soleil explosif
+            for(let i=0; i<20; i++) {
+                const angle = (Math.PI * 2 * i) / 20;
+                elements.push({
+                    type:'line',
+                    x:700,y:100,
+                    x2:700 + Math.cos(angle)*80,
+                    y2:100 + Math.sin(angle)*80,
+                    color:['#FF0000','#FF8C00','#FFD700','#FFFF00'][i%4],
+                    lineWidth:4
+                });
+            }
+            elements.push({type:'circle',x:700,y:100,radius:40,color:'#FFD700',fill:true});
+            elements.push({type:'circle',x:700,y:100,radius:50,color:'#FF8C00',fill:false,lineWidth:5});
+            
+            // Étoiles partout
+            for(let i=0; i<30; i++) {
+                elements.push({
+                    type:'star',
+                    x:Math.random()*800,
+                    y:Math.random()*300,
+                    radius:5+Math.random()*10,
+                    points:5,
+                    color:['#FFFFFF','#FFD700','#FF1493','#00FFFF'][i%4],
+                    fill:true
+                });
+            }
+            
+            // Spirales magiques
+            for(let s=0; s<5; s++) {
+                elements.push({
+                    type:'spiral',
+                    x:150 + s*150,
+                    y:300,
+                    radius:40,
+                    turns:3,
+                    color:['#FF00FF','#00FF00','#0000FF','#FF0000','#FFFF00'][s],
+                    lineWidth:3
+                });
+            }
+            
+            // Fleurs psychédéliques
+            for(let f=0; f<8; f++) {
+                const fx = 100 + f*90;
+                const fy = 450;
+                for(let p=0; p<8; p++) {
+                    const angle = (Math.PI * 2 * p) / 8;
+                    elements.push({
+                        type:'circle',
+                        x:fx + Math.cos(angle)*25,
+                        y:fy + Math.sin(angle)*25,
+                        radius:15,
+                        color:['#FF1493','#FF69B4','#FFB6C1','#FF00FF','#BA55D3'][p%5],
+                        fill:true
+                    });
+                }
+                elements.push({type:'circle',x:fx,y:fy,radius:12,color:'#FFD700',fill:true});
+            }
+            
+            // Bulles flottantes
+            for(let b=0; b<25; b++) {
+                elements.push({
+                    type:'circle',
+                    x:Math.random()*800,
+                    y:Math.random()*600,
+                    radius:10+Math.random()*30,
+                    color:['#00FFFF','#FF00FF','#00FF00','#FF0000'][b%4],
+                    fill:false,
+                    lineWidth:3
+                });
+            }
+            
+            // Vagues arc-en-ciel
+            for(let w=0; w<8; w++) {
+                elements.push({
+                    type:'bezier',
+                    x:0,y:200+w*40,
+                    cp1x:200,cp1y:180+w*40,
+                    cp2x:600,cp2y:220+w*40,
+                    x2:800,y2:200+w*40,
+                    color:['#FF0000','#FF8C00','#FFD700','#00FF00','#0000FF','#4B0082','#8B00FF','#FF00FF'][w],
+                    lineWidth:4
+                });
+            }
+            
+            // Confettis
+            for(let c=0; c<40; c++) {
+                elements.push({
+                    type:'rectangle',
+                    x:Math.random()*800,
+                    y:Math.random()*600,
+                    width:5+Math.random()*10,
+                    height:5+Math.random()*10,
+                    color:['#FF0000','#00FF00','#0000FF','#FFFF00','#FF00FF','#00FFFF'][c%6],
+                    fill:true,
+                    rotation:Math.random()*360
+                });
+            }
+            
+            return elements;
+        }
+
+        async function drawAI(instructions) {
+            clearCanvas();
+            for (const inst of instructions) {
+                ctx.save();
+                ctx.strokeStyle = inst.color || '#000000';
+                ctx.fillStyle = inst.color || '#000000';
+                ctx.lineWidth = inst.lineWidth || 2;
+                
+                if (inst.rotation) {
+                    ctx.translate(inst.x + (inst.width || 0)/2, inst.y + (inst.height || 0)/2);
+                    ctx.rotate(inst.rotation * Math.PI / 180);
+                    ctx.translate(-(inst.x + (inst.width || 0)/2), -(inst.y + (inst.height || 0)/2));
+                }
+                
+                switch (inst.type) {
+                    case 'circle':
+                        ctx.beginPath();
+                        ctx.arc(inst.x, inst.y, inst.radius, 0, Math.PI * 2);
+                        if (inst.fill) ctx.fill(); else ctx.stroke();
+                        break;
+                    case 'rectangle':
+                        if (inst.fill) ctx.fillRect(inst.x, inst.y, inst.width, inst.height);
+                        else ctx.strokeRect(inst.x, inst.y, inst.width, inst.height);
+                        break;
+                    case 'line':
+                        ctx.beginPath();
+                        ctx.moveTo(inst.x, inst.y);
+                        ctx.lineTo(inst.x2, inst.y2);
+                        ctx.stroke();
+                        break;
+                    case 'arc':
+                        ctx.beginPath();
+                        ctx.arc(inst.x, inst.y, inst.radius, inst.startAngle, inst.endAngle, inst.counterclockwise);
+                        ctx.stroke();
+                        break;
+                    case 'bezier':
+                        ctx.beginPath();
+                        ctx.moveTo(inst.x, inst.y);
+                        ctx.bezierCurveTo(inst.cp1x, inst.cp1y, inst.cp2x, inst.cp2y, inst.x2, inst.y2);
+                        ctx.stroke();
+                        break;
+                    case 'quadratic':
+                        ctx.beginPath();
+                        ctx.moveTo(inst.x, inst.y);
+                        ctx.quadraticCurveTo(inst.cpx, inst.cpy, inst.x2, inst.y2);
+                        ctx.stroke();
+                        break;
+                    case 'polygon':
+                        if (inst.points && inst.points.length > 0) {
+                            ctx.beginPath();
+                            ctx.moveTo(inst.points[0].x, inst.points[0].y);
+                            for (let i = 1; i < inst.points.length; i++) {
+                                ctx.lineTo(inst.points[i].x, inst.points[i].y);
+                            }
+                            ctx.closePath();
+                            if (inst.fill) ctx.fill(); else ctx.stroke();
+                        }
+                        break;
+                    case 'star':
+                        const points = inst.points || 5;
+                        const outerRadius = inst.radius;
+                        const innerRadius = outerRadius / 2.5;
+                        ctx.beginPath();
+                        for (let i = 0; i < points * 2; i++) {
+                            const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                            const angle = (Math.PI * i) / points - Math.PI / 2;
+                            const x = inst.x + Math.cos(angle) * radius;
+                            const y = inst.y + Math.sin(angle) * radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        if (inst.fill) ctx.fill(); else ctx.stroke();
+                        break;
+                    case 'spiral':
+                        const turns = inst.turns || 3;
+                        const maxRadius = inst.radius;
+                        ctx.beginPath();
+                        for (let i = 0; i <= turns * 360; i += 5) {
+                            const angle = (i * Math.PI) / 180;
+                            const radius = (maxRadius * i) / (turns * 360);
+                            const x = inst.x + Math.cos(angle) * radius;
+                            const y = inst.y + Math.sin(angle) * radius;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.stroke();
+                        break;
+                    case 'gradient':
+                        if (inst.colors && inst.colors.length >= 2) {
+                            const gradient = ctx.createLinearGradient(inst.x, inst.y, inst.x + inst.width, inst.y + inst.height);
+                            inst.colors.forEach((color, i) => {
+                                gradient.addColorStop(i / (inst.colors.length - 1), color);
+                            });
+                            ctx.fillStyle = gradient;
+                            ctx.fillRect(inst.x, inst.y, inst.width, inst.height);
+                        }
+                        break;
+                    case 'text':
+                        ctx.font = (inst.fontSize || 20) + 'px Arial';
+                        ctx.fillText(inst.content, inst.x, inst.y);
+                        break;
+                }
+                ctx.restore();
+                await new Promise(r => setTimeout(r, 20));
+            }
+        }
+
+        function openModal() {
+            document.getElementById('apiModal').classList.add('show');
+            document.getElementById('apiKeyInput').value = apiKey;
+        }
+
+        function closeModal() {
+            document.getElementById('apiModal').classList.remove('show');
+        }
+
+        function saveKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            if (key) {
+                apiKey = key;
+                localStorage.setItem('perplexityApiKey', key);
+                updateStatus();
+                closeModal();
+                alert('✅ Clé enregistrée');
+            } else {
+                alert('⚠️ Clé invalide');
+            }
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('apiStatus');
+            if (apiKey) {
+                status.className = 'api-status connected';
+                status.textContent = '✅ API connectée';
+            } else {
+                status.className = 'api-status disconnected';
+                status.textContent = '⚠️ API non configurée';
+            }
+        }
+
+        function saveDrawing() {
+            const title = prompt('Titre:');
+            if (!title) return;
+            const drawing = { id: Date.now(), title: title, image: canvas.toDataURL(), date: new Date().toLocaleDateString('fr-FR') };
+            drawings.unshift(drawing);
+            localStorage.setItem('drawings', JSON.stringify(drawings));
+            loadGallery();
+        }
+
+        function download() {
+            const link = document.createElement('a');
+            link.download = 'draw-' + Date.now() + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        function loadGallery() {
+            drawings = JSON.parse(localStorage.getItem('drawings') || '[]');
+            const gallery = document.getElementById('gallery');
+            if (drawings.length === 0) {
+                gallery.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">Aucun dessin</p>';
+                return;
+            }
+            gallery.innerHTML = drawings.map(d => '<div class="gallery-item"><img src="' + d.image + '" class="gallery-img"><div class="gallery-info"><strong>' + d.title + '</strong><div class="gallery-actions"><span style="font-size:0.85em;color:#666;">' + d.date + '</span><button class="delete-btn" onclick="deleteDraw(' + d.id + ')">🗑️</button></div></div></div>').join('');
+        }
+
+        function deleteDraw(id) {
+            if (confirm('Supprimer?')) {
+                drawings = drawings.filter(d => d.id !== id);
+                localStorage.setItem('drawings', JSON.stringify(drawings));
+                loadGallery();
+            }
+        }
+    </script>
+</body>
+</html>
